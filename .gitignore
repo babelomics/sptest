@@ -194,3 +194,5 @@ notebooks/data/
 
 *.odt#
 
+
+notebooks/XGBClassifier_cv_results\.csv
