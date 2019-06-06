@@ -15,6 +15,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.externals import joblib
 from .stacking_estimator import StackingEstimator
 from .zero_count import ZeroCount
+from .datasets import load_test_file, load_test_folder
 
 from pathlib import Path
 
@@ -113,10 +114,11 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
     def load_features(inputpath):
 
         inputpath = Path(inputpath)
+
         if inputpath.is_dir():
-            pass
+            features = load_test_folder(inputpath)
         elif inputpath.is_file():
-            pass
+            features = load_test_file(inputpath)
         else:
             raise IOError("Invalid file or folder {}".format(inputpath.name))
 
