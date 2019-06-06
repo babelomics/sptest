@@ -21,9 +21,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from hpsklearn import HyperoptEstimator, random_forest_regression
 from hyperopt import tpe
-from lightgbm.sklearn import LightGBMError
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.externals import joblib
@@ -35,6 +33,9 @@ from skopt.space import Real, Integer, Categorical
 from skopt.utils import use_named_args
 from xgboost.core import XGBoostError
 
+import xgboost as xgb
+from skopt import BayesSearchCV
+from sklearn.model_selection import StratifiedKFold
 
 
 def build_default_model(seed=42):
@@ -58,16 +59,18 @@ def build_default_model(seed=42):
 
 class SpanishPredictor(BaseEstimator, ClassifierMixin):
 
-    def __init__(self, mode=None, copy_X_train=True, random_state=42):
-        self.mode = mode
+    def __init__(self, tune=False, copy_X_train=True, seed=42, n_jobs=-1,
+                 n_iter=10**3):
+
+        self.tune = tune
         self.copy_X_train = copy_X_train
-        self.random_state=42
+        self.seed=seed
+        self.estimator=build_default_model(seed) if tune else None
+        self.n_jobs=n_jobs
+        self.n_iter=n_iter
 
     def fit(self, X, y=None):
-        """Fit estimator.
-
-        A suitable set of hyperparameters is found via either Tree-structured
-        Parzen Estimator (TPE) or Bayesian Optimization (BO).
+        """Fit estimator, it expects a binary response.
 
         Parameters
         ----------
@@ -76,7 +79,7 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
             efficiency. Sparse matrices are also supported, use sparse
             ``csc_matrix`` for maximum efficiency.
         y : array-like, [n_samples, n_outputs]
-            The target (continuous) values for regression.
+            The target (bianry) values for classification.
 
         Returns
         -------
@@ -85,16 +88,116 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
 
         # validate X, y
         X, y = check_X_y(X, y, multi_output=False, y_numeric=False)
+        self.fit_(X, y)
+
+    def fit_(self, X, y=None):
+
+        if self.tune:
+            tuner = self.bayes_tuner(self.n_jobs, self.seed, self.n_iter)
+            result = tuner.fit(X, y)
+            self.estimator = result.best_estimator_
+        else:
+            self.estimator.fit(X, y)
+
+    def predict_proba(self):
+
+        return self.estimator.predict_proba()
+
+    def predict_proba_from_file(self, inputpath):
+
+        X_test = load_features(inputpath)
+
+        return self.predict_proba(X_test)
+
+    @staticmethod
+    def load_features(inputpath):
+
+        inputpath = Path(inputpath)
+        if inputpath.is_dir():
+            pass
+        elif inputpath.is_file():
+            pass
+        else:
+            raise IOError("Invalid file or folder {}".format(inputpath.name))
 
     @classmethod
-    def load(cls, filename : str = None):
+    def build_estimator(cls, filename, mode):
+
         if filename is None:
-            clf = build_default_model()
+            estimator = build_default_model()
         else :
             with open(filename, "rb") as f:
-                clf = joblib.load(f)
+                estimator = joblib.load(f)
 
-        return clf
+        model = SpanishPredictor(
+            copy_X_train=estimator.copy_X_train
+        )
+        model.n_jobs = estimator.n_jobs
+
+        return model
 
     def save(self, filename : str):
-        joblib.dump(self, filename)
+
+        joblib.dump(self.estimator, filename)
+
+    @staticmethod
+    def build_default_model(seed=42):
+
+        estimator = make_pipeline(
+            StandardScaler(),
+            StackingEstimator(estimator=KNeighborsClassifier(n_neighbors=40,
+                                                            p=2,
+                                                            weights="uniform")),
+            StackingEstimator(estimator=LogisticRegression(C=5.0,
+                                                        dual=False,
+                                                        penalty="l1",
+                                                        random_state=seed)),
+            RobustScaler(),
+            ZeroCount(),
+            PCA(iterated_power=4, svd_solver="randomized", random_state=seed),
+            LogisticRegression(
+                C=20.0, dual=False, penalty="l1", random_state=seed)
+        )
+
+        return estimator
+
+    @staticmethod
+    def bayes_tuner(n_jobs, seed, n_iter):
+
+        tuner = BayesSearchCV(
+            estimator = xgb.XGBClassifier(
+                n_jobs=n_jobs,
+                objective='binary:logistic',
+                eval_metric='aucpr',
+                silent=1,
+                tree_method='approx'
+            ),
+            search_spaces={
+                'learning_rate': (0.01, 1.0, 'log-uniform'),
+                'min_child_weight': (0, 10),
+                'max_depth': (0, 50),
+                'max_delta_step': (0, 20),
+                'subsample': (0.01, 1.0, 'uniform'),
+                'colsample_bytree': (0.01, 1.0, 'uniform'),
+                'colsample_bylevel': (0.01, 1.0, 'uniform'),
+                'reg_lambda': (1e-9, 1000, 'log-uniform'),
+                'reg_alpha': (1e-9, 1.0, 'log-uniform'),
+                'gamma': (1e-9, 0.5, 'log-uniform'),
+                'min_child_weight': (0, 5),
+                'n_estimators': (50, 100),
+                'scale_pos_weight': (1e-6, 500, 'log-uniform')
+            },
+            scoring='average_precision',
+            cv=StratifiedKFold(
+                n_splits=3,
+                shuffle=True,
+                random_state=42
+            ),
+            n_jobs=n_jobs,
+            n_iter=n_iter,
+            verbose=0,
+            refit=True,
+            random_state=seed
+        )
+
+        return tuner
