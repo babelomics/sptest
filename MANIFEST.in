@@ -1,2 +1,2 @@
-include data/*
-include README.md
+graft sptest/data
+global-include README.md

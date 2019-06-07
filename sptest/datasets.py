@@ -8,6 +8,8 @@ Spanish Test I/O module.
 from pathlib import Path
 import pandas as pd
 
+import click
+
 from .utils import get_data_path
 
 DATA_PATH = get_data_path()
@@ -30,6 +32,7 @@ def load_training():
 
     return X_train, y_train, y_train_bin
 
+
 def load_test_file(fpath):
 
     fpath = Path(fpath)
@@ -39,8 +42,11 @@ def load_test_file(fpath):
     if df.shape[0] == 0:
         raise Exception("No samples found in {}".format(fpath))
 
+    df = df.iloc[0, :].copy()
+
     # Only the first sample must be evaluated
-    return df.iloc[0, :].copy()
+    return df
+
 
 def load_test_folder(inputpath):
 
@@ -50,7 +56,7 @@ def load_test_folder(inputpath):
     sample_names = []
     frames = []
     for fpath in inputpath.glob("**/*.Q"):
-    #     print(fpath)
+        #     print(fpath)
         sample_name = fpath.parent.name
         group = fpath.parent.parent.name
 
@@ -59,6 +65,8 @@ def load_test_folder(inputpath):
             groups.append(group)
             sample_names.append(sample_name)
             frames.append(df.iloc[0, :].copy())
+        except:
+            pass
 
     test_v2 = pd.concat(frames, axis=1, ignore_index=True).T
     test_v2.index = sample_names
