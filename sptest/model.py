@@ -5,57 +5,34 @@ email: carlos.loucera@juntadeandalucia.es
 Spanish Test learning module.
 """
 
-from sklearn.decomposition import PCA
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.pipeline import make_pipeline, make_union
-from sklearn.preprocessing import RobustScaler, StandardScaler
-from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.externals import joblib
-from .stacking_estimator import StackingEstimator
-from .zero_count import ZeroCount
-from .datasets import load_test_file, load_test_folder
-
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from hyperopt import tpe
-from sklearn.base import BaseEstimator, RegressorMixin
+import xgboost as xgb
+from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
+from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.externals import joblib
-from sklearn.model_selection import cross_val_score
-from sklearn.utils.validation import check_X_y, check_is_fitted
-from skopt import gp_minimize
-from skopt import load
-from skopt.space import Real, Integer, Categorical
+import joblib
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import (StratifiedKFold, cross_val_score,
+                                     train_test_split)
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.pipeline import make_pipeline, make_union
+from sklearn.preprocessing import RobustScaler, StandardScaler
+from sklearn.utils.validation import check_is_fitted, check_X_y
+from skopt import BayesSearchCV, gp_minimize, load
+from skopt.space import Categorical, Integer, Real
 from skopt.utils import use_named_args
 from xgboost.core import XGBoostError
 
-import xgboost as xgb
-from skopt import BayesSearchCV
-from sklearn.model_selection import StratifiedKFold
+from .datasets import load_test_file, load_test_folder
+from .stacking_estimator import StackingEstimator
+from .zero_count import ZeroCount
 
 
-def build_default_model(seed=42):
-    estimator = make_pipeline(
-        StandardScaler(),
-        StackingEstimator(estimator=KNeighborsClassifier(n_neighbors=40,
-                                                         p=2,
-                                                         weights="uniform")),
-        StackingEstimator(estimator=LogisticRegression(C=5.0,
-                                                       dual=False,
-                                                       penalty="l1",
-                                                       random_state=seed)),
-        RobustScaler(),
-        ZeroCount(),
-        PCA(iterated_power=4, svd_solver="randomized", random_state=seed),
-        LogisticRegression(C=20.0, dual=False, penalty="l1", random_state=seed)
-    )
-
-    return estimator
+POS_CLASS_INDEX = 1
 
 
 class SpanishPredictor(BaseEstimator, ClassifierMixin):
