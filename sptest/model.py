@@ -168,7 +168,7 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
             },
             scoring='average_precision',
             cv=StratifiedKFold(
-                n_splits=3,
+                n_splits=10,
                 shuffle=True,
                 random_state=42
             ),
