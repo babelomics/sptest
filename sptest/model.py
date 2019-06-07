@@ -158,7 +158,7 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
     def bayes_tuner(n_jobs, seed, n_iter):
 
         tuner = BayesSearchCV(
-            estimator = xgb.XGBClassifier(
+            estimator=xgb.XGBClassifier(
                 n_jobs=n_jobs,
                 objective='binary:logistic',
                 eval_metric='aucpr',
