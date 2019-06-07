@@ -10,42 +10,50 @@ import click
 from .model import SpanishPredictor
 from .utils import get_default_model_path
 
+
 @click.group()
-@click.option("--ncpu", type=int, help="Number of cores to use.")
+@click.option("--ncpu", default=-1, type=int, help="Number of cores to use.")
 @click.pass_context
 def main(ctx, ncpu):
-    ctx["ncpu"] = ncpu
+    ctx.obj = {
+        "ncpu": ncpu
+    }
 
 
 @main.command()
 @click.option('--tune', is_flag=True, help="Will print verbose messages.")
 @click.option("--inputpath", default="", help="Training path")
-@click.argument("--outputpath", help="Where to store the trained model")
+@click.argument("--outputpath")
 @click.pass_context
 def train(ctx, tune, inputpath, outputpath):
+    """ Where to store the trained model """
     model = SpanishPredictor(
         tune=tune,
-        n_jobs=ctx["ncpu"]
+        n_jobs=ctx.obj["ncpu"]
         )
 
 
 @main.command()
-@click.argument("-inputpath", help="Test file (.Q)")
-@clcik.option("--model_path", help="Model for prediction")
+@click.argument("inputpath", required=1)
+@click.option(
+    "--model_path",
+    default=get_default_model_path(),
+    help="Model for prediction")
 @click.pass_context
-def eval(ctx, inputpath, model_path=None):
+def eval(ctx, inputpath, model_path):
+    """"Test file (.Q)"
+    """
 
-    if model_path is None:
-        model_path = get_default_model_path()
-
-    model = SpanishPredictor.load(model_path)
-    proba = model.predict_from_file(inputpath)
-    click.echo(proba)
-
-
-def start():
-    main(obj={})
+    model = SpanishPredictor.build_estimator(
+        n_jobs=ctx.obj["ncpu"],
+        filename=model_path
+    )
+    proba = model.predict_proba_from_file(inputpath)
+    if proba.shape[0] == 1:
+        click.echo(proba[0])
+    else:
+        click.echo(proba)
 
 
 if __name__ == "__main__":
-    start()
+    main()
