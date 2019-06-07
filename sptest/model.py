@@ -102,43 +102,54 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
         else:
             raise IOError("Invalid file or folder {}".format(inputpath.name))
 
+        return features
+
     @classmethod
-    def build_estimator(cls, filename, mode):
+    def build_estimator(cls, n_jobs=-1, filename=None):
 
         if filename is None:
             estimator = build_default_model()
-        else :
+        else:
             with open(filename, "rb") as f:
                 estimator = joblib.load(f)
 
-        model = SpanishPredictor(
-            copy_X_train=estimator.copy_X_train
-        )
-        model.n_jobs = estimator.n_jobs
+        model = SpanishPredictor()
+        model.estimator = estimator
+        if hasattr(estimator, "n_jobs"):
+            model.n_jobs = estimator.n_jobs
+        else:
+            model.n_jobs = n_jobs
 
         return model
 
-    def save(self, filename : str):
+    def save(self, filename: str):
 
         joblib.dump(self.estimator, filename)
 
     @staticmethod
-    def build_default_model(seed=42):
+    def build_default_model(n_jobs=-1, seed=42):
 
         estimator = make_pipeline(
             StandardScaler(),
-            StackingEstimator(estimator=KNeighborsClassifier(n_neighbors=40,
-                                                            p=2,
-                                                            weights="uniform")),
-            StackingEstimator(estimator=LogisticRegression(C=5.0,
-                                                        dual=False,
-                                                        penalty="l1",
-                                                        random_state=seed)),
+            StackingEstimator(estimator=KNeighborsClassifier(
+                n_neighbors=40,
+                p=2,
+                weights="uniform")),
+            StackingEstimator(estimator=LogisticRegression(
+                C=5.0,
+                dual=False,
+                penalty="l1",
+                random_state=seed,
+                n_jobs=n_jobs,
+                n_iter=10**4)),
             RobustScaler(),
             ZeroCount(),
             PCA(iterated_power=4, svd_solver="randomized", random_state=seed),
             LogisticRegression(
-                C=20.0, dual=False, penalty="l1", random_state=seed)
+                C=20.0, dual=False, penalty="l1", random_state=seed,
+                n_jobs=n_jobs,
+                n_iter=10**4
+                )
         )
 
         return estimator
