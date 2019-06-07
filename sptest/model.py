@@ -42,10 +42,10 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
 
         self.tune = tune
         self.copy_X_train = copy_X_train
-        self.seed=seed
-        self.estimator=build_default_model(seed) if tune else None
-        self.n_jobs=n_jobs
-        self.n_iter=n_iter
+        self.seed = seed
+        self.estimator = build_default_model(n_jobs, seed) if tune else None
+        self.n_jobs = n_jobs
+        self.n_iter = n_iter
 
     def fit(self, X, y=None):
         """Fit estimator, it expects a binary response.
