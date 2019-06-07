@@ -15,9 +15,13 @@ from .utils import get_data_path
 DATA_PATH = get_data_path()
 
 
-def load_training():
-    labels_training_path = DATA_PATH.joinpath("ids_1000g.R")
-    features_training_path = DATA_PATH.joinpath("plink.26.Q")
+def load_training(data_path=None):
+
+    if data_path is None:
+        data_path = DATA_PATH
+
+    labels_training_path = data_path.joinpath("ids_1000g.R")
+    features_training_path = data_path.joinpath("plink.26.Q")
 
     X_train = pd.read_csv(features_training_path, header=None, sep=" ")
     y_train = pd.read_csv(
@@ -30,7 +34,7 @@ def load_training():
 
     y_train_bin = y_train["nationality"].values.ravel() == "Spanish"
 
-    return X_train, y_train, y_train_bin
+    return X_train, y_train_bin
 
 
 def load_test_file(fpath):
@@ -71,3 +75,5 @@ def load_test_folder(inputpath):
     test_v2 = pd.concat(frames, axis=1, ignore_index=True).T
     test_v2.index = sample_names
     test_v2.head()
+
+    return test_v2

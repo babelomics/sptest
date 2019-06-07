@@ -9,6 +9,7 @@ import click
 
 from .model import SpanishPredictor
 from .utils import get_default_model_path
+from .datasets import load_training
 
 
 @click.group()
@@ -22,15 +23,20 @@ def main(ctx, ncpu):
 
 @main.command()
 @click.option('--tune', is_flag=True, help="Will print verbose messages.")
-@click.option("--inputpath", default="", help="Training path")
-@click.argument("--outputpath")
+@click.option("--inputpath", default=None, help="Training path")
+@click.argument("--outputpath", required=1)
 @click.pass_context
 def train(ctx, tune, inputpath, outputpath):
     """ Where to store the trained model """
+
+    X, y = load_training(inputpath)
+
     model = SpanishPredictor(
         tune=tune,
         n_jobs=ctx.obj["ncpu"]
         )
+    model.fit(X, y)
+    model.save(outputpath)
 
 
 @main.command()
@@ -56,4 +62,5 @@ def eval(ctx, inputpath, model_path):
 
 
 if __name__ == "__main__":
+    # pylint: disable=no-value-for-parameter
     main()

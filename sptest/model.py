@@ -7,6 +7,7 @@ Spanish Test learning module.
 
 from pathlib import Path
 
+import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -14,7 +15,6 @@ import xgboost as xgb
 from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestRegressor
-import joblib
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import (StratifiedKFold, cross_val_score,
                                      train_test_split)
@@ -31,7 +31,6 @@ from .datasets import load_test_file, load_test_folder
 from .stacking_estimator import StackingEstimator
 from .zero_count import ZeroCount
 
-
 POS_CLASS_INDEX = 1
 
 
@@ -43,7 +42,10 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
         self.tune = tune
         self.copy_X_train = copy_X_train
         self.seed = seed
-        self.estimator = build_default_model(n_jobs, seed) if tune else None
+        if tune:
+            self.estimator = None
+        else:
+            self.estimator = SpanishPredictor.build_default_model(n_jobs, seed)
         self.n_jobs = n_jobs
         self.n_iter = n_iter
 
@@ -108,7 +110,7 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
     def build_estimator(cls, n_jobs=-1, filename=None):
 
         if filename is None:
-            estimator = build_default_model()
+            estimator = SpanishPredictor.build_default_model(n_jobs)
         else:
             with open(filename, "rb") as f:
                 estimator = joblib.load(f)
@@ -141,15 +143,15 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
                 penalty="l1",
                 random_state=seed,
                 n_jobs=n_jobs,
-                n_iter=10**4)),
+                max_iter=10**4)),
             RobustScaler(),
             ZeroCount(),
             PCA(iterated_power=4, svd_solver="randomized", random_state=seed),
             LogisticRegression(
                 C=20.0, dual=False, penalty="l1", random_state=seed,
                 n_jobs=n_jobs,
-                n_iter=10**4
-                )
+                max_iter=10**4
+            )
         )
 
         return estimator
@@ -176,7 +178,6 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
                 'reg_lambda': (1e-9, 1000, 'log-uniform'),
                 'reg_alpha': (1e-9, 1.0, 'log-uniform'),
                 'gamma': (1e-9, 0.5, 'log-uniform'),
-                'min_child_weight': (0, 5),
                 'n_estimators': (50, 100),
                 'scale_pos_weight': (1e-6, 500, 'log-uniform')
             },
