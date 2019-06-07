@@ -77,15 +77,18 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
         else:
             self.estimator.fit(X, y)
 
-    def predict_proba(self):
+    def predict_proba(self, X):
 
-        return self.estimator.predict_proba()
+        return self.estimator.predict_proba(X)
 
     def predict_proba_from_file(self, inputpath):
 
-        X_test = load_features(inputpath)
+        X_test = self.load_features(inputpath)
+        if X_test.ndim != 2:
+            # Only one sample (i.e. single .Q file)
+            X_test = X_test.values.reshape(1, -1)
 
-        return self.predict_proba(X_test)
+        return self.predict_proba(X_test)[:, POS_CLASS_INDEX]
 
     @staticmethod
     def load_features(inputpath):
