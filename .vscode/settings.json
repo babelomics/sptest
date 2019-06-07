@@ -1,3 +1,5 @@
 {
-    "python.pythonPath": "/home/cloucera/apps/miniconda3/envs/idp3/bin/python"
+    "python.pythonPath": "/home/cloucera/apps/miniconda3/envs/idp3/bin/python",
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": true
 }
