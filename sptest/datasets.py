@@ -69,8 +69,9 @@ def load_test_folder(inputpath):
             groups.append(group)
             sample_names.append(sample_name)
             frames.append(df.iloc[0, :].copy())
-        except:
-            pass
+        except IOError as io_except:
+            print("No available data for {} which".format(fpath))
+            print(traceback.format_exc(io_except))
 
     test_v2 = pd.concat(frames, axis=1, ignore_index=True).T
     test_v2.index = sample_names
