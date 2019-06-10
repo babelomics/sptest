@@ -16,7 +16,7 @@ from .datasets import load_training
 @click.option("--ncpu", default=-1, type=int, help="Number of cores to use.")
 @click.pass_context
 def main(ctx, ncpu):
-    """CLI entry point."""
+    """Spanish-ascendancy predictor via Machine Learning."""
     ctx.obj = {
         "ncpu": ncpu
     }
@@ -25,16 +25,18 @@ def main(ctx, ncpu):
 @main.command()
 @click.option('--tune', is_flag=True, help="If tune use BO with XGBoost.")
 @click.option("--inputpath", default=None, help="Training path")
+@click.option("--niters", default=10, help="Optimization iterations.")
 @click.argument("outputpath", required=1)
 @click.pass_context
-def train(ctx, tune, inputpath, outputpath):
+def train(ctx, tune, inputpath, outputpath, niters):
     """1k-Genome training and store model in outputpath."""
 
     features, labels = load_training(inputpath)
 
     model = SpanishPredictor(
         tune=tune,
-        n_jobs=ctx.obj["ncpu"]
+        n_jobs=ctx.obj["ncpu"],
+        n_iter=niters
         )
     model.fit(features, labels)
     model.save(outputpath)
