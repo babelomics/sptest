@@ -112,7 +112,7 @@ def load_test_folder(inputpath):
             features_single = load_test_file(fpath)
             groups.append(group)
             sample_names.append(sample_name)
-            frames.append(features_single.iloc[0, :].copy())
+            frames.append(features_single)
         except IOError as io_except:
             print("No available data for {} which".format(fpath))
             print(traceback.format_exc(io_except))
