@@ -6,9 +6,9 @@ Spanish Test I/O module.
 """
 
 from pathlib import Path
-import pandas as pd
+import traceback
 
-import click
+import pandas as pd
 
 from .utils import get_data_path
 
@@ -23,8 +23,8 @@ def load_training(data_path=None):
     labels_training_path = data_path.joinpath("ids_1000g.R")
     features_training_path = data_path.joinpath("plink.26.Q")
 
-    X_train = pd.read_csv(features_training_path, header=None, sep=" ")
-    y_train = pd.read_csv(
+    features = pd.read_csv(features_training_path, header=None, sep=" ")
+    labels = pd.read_csv(
         labels_training_path,
         header=None,
         sep=" ",
@@ -32,24 +32,24 @@ def load_training(data_path=None):
         names=["nationality", "continent"]
     )
 
-    y_train_bin = y_train["nationality"].values.ravel() == "Spanish"
+    labels_bin = labels["nationality"].values.ravel() == "Spanish"
 
-    return X_train, y_train_bin
+    return features, labels_bin
 
 
 def load_test_file(fpath):
 
     fpath = Path(fpath)
     # load .Q file as pandas DataFrame
-    df = pd.read_csv(fpath, header=None, sep=" ")
+    features = pd.read_csv(fpath, header=None, sep=" ")
 
-    if df.shape[0] == 0:
+    if features.shape[0] == 0:
         raise Exception("No samples found in {}".format(fpath))
 
-    df = df.iloc[0, :].copy()
+    features = features.iloc[0, :].copy()
 
     # Only the first sample must be evaluated
-    return df
+    return features
 
 
 def load_test_folder(inputpath):
@@ -65,16 +65,15 @@ def load_test_folder(inputpath):
         group = fpath.parent.parent.name
 
         try:
-            df = load_test_file(fpath)
+            features_single = load_test_file(fpath)
             groups.append(group)
             sample_names.append(sample_name)
-            frames.append(df.iloc[0, :].copy())
+            frames.append(features_single.iloc[0, :].copy())
         except IOError as io_except:
             print("No available data for {} which".format(fpath))
             print(traceback.format_exc(io_except))
 
-    test_v2 = pd.concat(frames, axis=1, ignore_index=True).T
-    test_v2.index = sample_names
-    test_v2.head()
+    features = pd.concat(frames, axis=1, ignore_index=True).T
+    features.index = sample_names
 
-    return test_v2
+    return features
