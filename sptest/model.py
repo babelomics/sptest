@@ -1,40 +1,59 @@
+#coding: utf-8
+# pylint: disable=invalid-name, too-many-arguments
+
 """
 author: Carlos Loucera
 email: carlos.loucera@juntadeandalucia.es
 
-Spanish Test learning module.
+Spanish Test learning module. Spanish here refers to the ML class.
 """
 
 from pathlib import Path
 
 import joblib
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
 import xgboost as xgb
-from sklearn.base import BaseEstimator, ClassifierMixin, RegressorMixin
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.decomposition import PCA
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import (StratifiedKFold, cross_val_score,
-                                     train_test_split)
+from sklearn.model_selection import StratifiedKFold
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.pipeline import make_pipeline, make_union
+from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import RobustScaler, StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_X_y
-from skopt import BayesSearchCV, gp_minimize, load
-from skopt.space import Categorical, Integer, Real
-from skopt.utils import use_named_args
-from xgboost.core import XGBoostError
+from skopt import BayesSearchCV
 
 from .datasets import load_test_file, load_test_folder
 from .stacking_estimator import StackingEstimator
 from .zero_count import ZeroCount
 
+
+# Index of the positive class in an probability array,
 POS_CLASS_INDEX = 1
 
 
 class SpanishPredictor(BaseEstimator, ClassifierMixin):
+    """This class implments a Machine Learning (ML) method to classify a given
+    sample as Spanish or  no-Spanish.
+
+    Parameters
+    ----------
+    tune : bool, optional (default: False)
+        Tune an ensamble of trees with Bayessian Optimization, by default False
+        uses a predefined model (found via TPOT and AUCPR).
+    copy_X_train : bool, optional (default: True)
+        If True, a persistent copy of the training data is stored in the
+        object. Otherwise, just a reference to the training data is stored,
+        which might cause predictions to change if the data is modified
+        externally.
+    seed : int, optional (default: 42)
+        Seed to initalize the random number generator, by default 42.
+    n_jobs : int, optional (default: -1)
+        Number of jobs to run in parallel, by default -1 uses all available
+        cores.
+    n_iter : int, optional _(default: 1000)
+        Number of BO iterations during BO tunning, by default 10**3.
+
+    """
 
     def __init__(self, tune=False, copy_X_train=True, seed=42, n_jobs=-1,
                  n_iter=10**3):
@@ -53,8 +72,8 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
         """Fit estimator, it expects a binary response.
 
         Parameters
-        ----------
-        X : array-like or sparse matrix, shape=(n_samples, n_features)
+        -------
+        X : array-like featuresse matrix, shape=(n_samples, n_features)
             The input samples. Use ``dtype=np.float32`` for maximum
             efficiency. Sparse matrices are also supported, use sparse
             ``csc_matrix`` for maximum efficiency.
@@ -63,7 +82,7 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
 
         Returns
         -------
-        self : object
+        self : returns an instance of self.
         """
 
         # validate X, y
@@ -71,6 +90,21 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
         self.fit_(X, y)
 
     def fit_(self, X, y=None):
+        """If self.tune fits an BO-tunned ensemble of trees, otherwise fits a
+        predefined stacked estimator.
+
+        Parameters
+        ----------
+        X : array-like, shape = (n_samples, n_features)
+            Training data
+        y : array-like, shape = (n_samples, [n_output_dims])
+            Target values
+
+        Returns
+        -------
+        self : returns an instance of self.
+
+        """
 
         if self.tune:
             tuner = self.bayes_tuner(self.n_jobs, self.seed, self.n_iter)
@@ -80,10 +114,38 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
             self.estimator.fit(X, y)
 
     def predict_proba(self, X):
+        """Predict the probability estimate of a given sample or set of samples.
+
+        Parameters
+        ----------
+        X : array-like, shape = [n_samples, n_features]
+            Population probabilities as features.
+
+        Returns
+        -------
+        T : array-like, shape = [n_samples, ]
+            Returns the probability of being Spanish of the samples.
+
+        """
+
+        check_is_fitted(self.estimator, X)
 
         return self.estimator.predict_proba(X)
 
     def predict_proba_from_file(self, inputpath):
+        """Predict the probability estimate of a given sample or set of samples.
+
+        Parameters
+        ----------
+        inputpath : string
+            A .Q file or a folder where several .Q files are stored.
+
+        Returns
+        -------
+        T : array-like, shape = [n_samples, ]
+            Returns the probability of being Spanish of the samples.
+
+        """
 
         X_test = self.load_features(inputpath)
         if X_test.ndim != 2:
@@ -94,6 +156,24 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
 
     @staticmethod
     def load_features(inputpath):
+        """Load a single .Q file or a set of grouped .Q files.
+
+        Parameters
+        ----------
+        inputpath : string
+            Either a .Q  path of a given sample or the folder where several
+            groups of .Q files are stored.
+
+        Returns
+        -------
+        DataFrame, shape=[n_samples, n_features]
+            Poulation probability estimates.
+
+        Raises
+        ------
+        IOError
+            I/O error.
+        """
 
         inputpath = Path(inputpath)
 
@@ -108,6 +188,22 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
 
     @classmethod
     def build_estimator(cls, n_jobs=-1, filename=None):
+        """Another form to build and estimator.
+
+        Parameters
+        ----------
+        n_jobs : int, optional (default: -1)
+        Number of jobs to run in parallel, by default -1 uses all available
+        cores.
+
+        filename : string, optional (default: None)
+            Loads a model stored in ``filename``, by default None loads a
+            predefined model.
+
+        Returns
+        -------
+        An instance of ``SpanishPredictor``.
+        """
 
         if filename is None:
             estimator = SpanishPredictor.build_default_model(n_jobs)
@@ -125,11 +221,34 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
         return model
 
     def save(self, filename: str):
+        """Saves a fitted model into a binary a file.
+
+        Parameters
+        ----------
+        filename : str
+            File path where to store the model in binary form.
+        """
 
         joblib.dump(self.estimator, filename)
 
     @staticmethod
     def build_default_model(n_jobs=-1, seed=42):
+        """Builds an stacked estimator (a binary classifier):
+
+        Parameters
+        ----------
+        n_jobs : int, optional (default: -1)
+            Number of jobs to run in parallel, by default -1 uses all available
+            cores.
+
+        seed : int, optional (default: 42)
+            Seed to initalize the random number generator, by default 42.
+
+        Returns
+        -------
+        p : Pipeline
+
+        """
 
         estimator = make_pipeline(
             StandardScaler(),
@@ -158,6 +277,26 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
 
     @staticmethod
     def bayes_tuner(n_jobs, seed, n_iter):
+        """Builds a Bayessian optimizer to fit a binary classifier based on
+        an esemble of trees.
+
+        Parameters
+        ----------
+        n_jobs : int, optional (default: -1)
+            Number of jobs to run in parallel, by default -1 uses all available
+            cores.
+
+        seed : int, optional (default: 42)
+            Seed to initalize the random number generator, by default 42.
+
+        n_iter : [type]
+            [description]
+
+        Returns
+        -------
+        tuner: BayesSearchCV object
+
+        """
 
         tuner = BayesSearchCV(
             estimator=xgb.XGBClassifier(
