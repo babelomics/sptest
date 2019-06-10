@@ -128,7 +128,7 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
 
         """
 
-        check_is_fitted(self.estimator, X)
+        check_is_fitted(self.estimator, "fit")
 
         return self.estimator.predict_proba(X)
 
