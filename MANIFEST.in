@@ -1,0 +1,2 @@
+graft sptest/data
+global-include README.md
