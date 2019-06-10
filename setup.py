@@ -19,7 +19,7 @@ setup(
     include_package_data=True,
     install_requires=[
         'numpy', 'pandas', 'click', 'scikit-learn',
-        'matplotlib', 'scikit-optimize', 'xgboost'
+        'matplotlib', 'hyperopt', 'xgboost'
     ],
     entry_points={
         'console_scripts': ['sptest = sptest.cli:main']
