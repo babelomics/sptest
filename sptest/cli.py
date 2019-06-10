@@ -16,26 +16,27 @@ from .datasets import load_training
 @click.option("--ncpu", default=-1, type=int, help="Number of cores to use.")
 @click.pass_context
 def main(ctx, ncpu):
+    """CLI entry point."""
     ctx.obj = {
         "ncpu": ncpu
     }
 
 
 @main.command()
-@click.option('--tune', is_flag=True, help="Will print verbose messages.")
+@click.option('--tune', is_flag=True, help="If tune use BO with XGBoost.")
 @click.option("--inputpath", default=None, help="Training path")
-@click.argument("--outputpath", required=1)
+@click.argument("outputpath", required=1)
 @click.pass_context
 def train(ctx, tune, inputpath, outputpath):
-    """ Where to store the trained model """
+    """1k-Genome training and store model in outputpath."""
 
-    X, y = load_training(inputpath)
+    features, labels = load_training(inputpath)
 
     model = SpanishPredictor(
         tune=tune,
         n_jobs=ctx.obj["ncpu"]
         )
-    model.fit(X, y)
+    model.fit(features, labels)
     model.save(outputpath)
 
 
@@ -46,8 +47,9 @@ def train(ctx, tune, inputpath, outputpath):
     default=get_default_model_path(),
     help="Model for prediction")
 @click.pass_context
-def eval(ctx, inputpath, model_path):
-    """"Test file (.Q)"
+def predict(ctx, inputpath, model_path):
+    """"Predict a given .Q file. The ouput is the probability to be Spanish. Use
+    a pretrained model if no binary file is provided.
     """
 
     model = SpanishPredictor.build_estimator(
