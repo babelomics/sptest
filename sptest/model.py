@@ -11,21 +11,21 @@ Spanish Test learning module. Spanish here refers to the ML class.
 from pathlib import Path
 
 import joblib
+import numpy as np
 import xgboost as xgb
+from hyperopt import STATUS_OK, Trials, fmin, hp, tpe
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import cross_val_score
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import RobustScaler, StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_X_y
-from skopt import BayesSearchCV
 
 from .datasets import load_test_file, load_test_folder
 from .stacking_estimator import StackingEstimator
 from .zero_count import ZeroCount
-
 
 # Index of the positive class in an probability array,
 POS_CLASS_INDEX = 1
@@ -107,9 +107,19 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
         """
 
         if self.tune:
-            tuner = self.bayes_tuner(self.n_jobs, self.seed, self.n_iter)
-            result = tuner.fit(X, y)
-            self.estimator = result.best_estimator_
+            tuner = ParzenCV(
+                n_jobs=self.n_jobs,
+                random_state=self.seed,
+                n_iter=self.n_iter)
+
+            if hasattr(X, "values"):
+                X = X.values
+            if hasattr(y, "values"):
+                y = y.values.ravel()
+
+            tuner.fit(X, y)
+
+            self.estimator = tuner.best_estimator_
         else:
             self.estimator.fit(X, y)
 
@@ -151,6 +161,8 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
         if X_test.ndim != 2:
             # Only one sample (i.e. single .Q file)
             X_test = X_test.values.reshape(1, -1)
+        else:
+            X_test = X_test.values
 
         return self.predict_proba(X_test)[:, POS_CLASS_INDEX]
 
@@ -275,62 +287,115 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
 
         return estimator
 
-    @staticmethod
-    def bayes_tuner(n_jobs, seed, n_iter):
-        """Builds a Bayessian optimizer to fit a binary classifier based on
-        an esemble of trees.
 
-        Parameters
-        ----------
-        n_jobs : int, optional (default: -1)
-            Number of jobs to run in parallel, by default -1 uses all available
-            cores.
+class ParzenCV(object):
+    """Find an optimized XGBoost via Tree of Parzen estimators."""
 
-        seed : int, optional (default: 42)
-            Seed to initalize the random number generator, by default 42.
+    def __init__(self, search_spaces=None,
+                 scoring="average_precision", cv=10, n_jobs=-1,
+                 n_iter=10**3, verbose=0, refit=True,
+                 random_state=42):
 
-        n_iter : [type]
-            [description]
+        if search_spaces is None:
+            self.search_spaces = ParzenCV.get_default_xgb_space()
+        else:
+            self.search_spaces = search_spaces
+        self.scoring = scoring
+        self.cv = cv
+        self.n_jobs = n_jobs
+        self.n_iter = n_iter
+        self.verbose = verbose
+        self.refit = refit
+        self.random_state = random_state
+        self.best_estimator_ = None
+        self.history = None
 
-        Returns
-        -------
-        tuner: BayesSearchCV object
+    # Estimate XGB params
+    def fit(self, X, y):
+        """Fit/optiize via Tree of Parzen estimators."""
+        space = self.get_default_xgb_space()
+        self.history = self.optimize(space, X, y)
 
-        """
-
-        tuner = BayesSearchCV(
-            estimator=xgb.XGBClassifier(
-                n_jobs=n_jobs,
-                objective='binary:logistic',
-                eval_metric='aucpr',
-                silent=1,
-                tree_method='approx'
-            ),
-            search_spaces={
-                'learning_rate': (0.01, 1.0, 'log-uniform'),
-                'min_child_weight': (0, 10),
-                'max_depth': (0, 50),
-                'max_delta_step': (0, 20),
-                'subsample': (0.01, 1.0, 'uniform'),
-                'colsample_bytree': (0.01, 1.0, 'uniform'),
-                'colsample_bylevel': (0.01, 1.0, 'uniform'),
-                'reg_lambda': (1e-9, 1000, 'log-uniform'),
-                'reg_alpha': (1e-9, 1.0, 'log-uniform'),
-                'gamma': (1e-9, 0.5, 'log-uniform'),
-                'n_estimators': (50, 100),
-                'scale_pos_weight': (1e-6, 500, 'log-uniform')
-            },
-            scoring='average_precision',
-            cv=StratifiedKFold(
-                n_splits=10,
-                shuffle=True,
-                random_state=42
-            ),
-            n_jobs=n_jobs,
-            n_iter=n_iter,
-            verbose=0,
-            refit=True,
-            random_state=seed
+        estimator_ = xgb.XGBClassifier(
+            n_estimators=10000,
+            max_depth=int(self.history['max_depth']),
+            learning_rate=self.history['learning_rate'],
+            min_child_weight=self.history['min_child_weight'],
+            subsample=self.history['subsample'],
+            gamma=self.history['gamma'],
+            colsample_bytree=self.history['colsample_bytree'],
+            verbose=1,
+            verbose_eval=1,
+            silent=1,
+            nthread=self.n_jobs,
+            tree_method='approx',
+            eval_metric='aucpr',
+            objective='binary:logistic'
         )
 
-        return tuner
+        if self.refit:
+            estimator_.fit(X, y)
+
+        self.best_estimator_ = estimator_
+
+    @staticmethod
+    def get_default_xgb_space():
+        """Get XGBoost default hyperparamter space."""
+        _space = {
+            'learning_rate': hp.uniform('learning_rate', 0.01, 0.1),
+            'max_depth': hp.quniform('max_depth', 8, 15, 1),
+            'min_child_weight': hp.quniform('min_child_weight', 1, 5, 1),
+            'subsample': hp.quniform('subsample', 0.7, 1, 0.05),
+            'gamma': hp.quniform('gamma', 0.9, 1, 0.05),
+            'colsample_bytree': hp.quniform('colsample_bytree', 0.5, 0.7, 0.05)
+        }
+
+        return _space
+
+    def optimize(self, params_space, X, y):
+        """Optimization loop."""
+
+        def objective(params):
+            """Objective function to minimize."""
+
+            _estimator = xgb.XGBClassifier(
+                n_estimators=100,
+                max_depth=int(params['max_depth']),
+                learning_rate=params['learning_rate'],
+                min_child_weight=params['min_child_weight'],
+                subsample=params['subsample'],
+                colsample_bytree=params['colsample_bytree'],
+                gamma=params['gamma'],
+                verbose=1,
+                verbose_eval=1,
+                silent=1,
+                nthread=self.n_jobs,
+                tree_method='approx',
+                eval_metric='aucpr',
+                objective='binary:logistic'
+            )
+
+            cv_scores = cross_val_score(
+                _estimator,
+                X,
+                y,
+                scoring=self.scoring,
+                cv=self.cv,
+                n_jobs=self.n_jobs
+            )
+
+            score = 1 - np.mean(cv_scores)
+
+            return {'loss': 1.0 - score, 'status': STATUS_OK}
+
+        trials = Trials()
+        history = fmin(
+            fn=objective,
+            space=params_space,
+            algo=tpe.suggest,
+            max_evals=self.n_iter,
+            trials=trials,
+            verbose=0
+        )
+
+        return history
