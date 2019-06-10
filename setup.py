@@ -18,7 +18,7 @@ setup(
     packages=['sptest'],
     include_package_data=True,
     install_requires=[
-        'numpy', 'pandas', 'click', 'python-dotenv', 'scikit-learn',
+        'numpy', 'pandas', 'click', 'scikit-learn',
         'matplotlib', 'scikit-optimize', 'xgboost'
     ],
     entry_points={
