@@ -321,7 +321,7 @@ class ParzenCV(object):
 
     # Estimate XGB params
     def fit(self, X, y):
-        """Fit/optiize via Tree-structured Parzen Estimator."""
+        """Fit/optimize via Tree-structured Parzen Estimator."""
 
         space = self.get_default_xgb_space()
         self.history = self.optimize(space, X, y)
@@ -331,7 +331,7 @@ class ParzenCV(object):
 
         params = {**best_params, **problem_params}
 
-        estimator_ = xgb.XGBClassifier(**params)
+        estimator_ = SkXGB(**params)
 
         if self.refit:
             estimator_.fit(X, y)
@@ -393,7 +393,7 @@ class ParzenCV(object):
 
             params = {**params, **problem_params}
 
-            _estimator = xgb.XGBClassifier(**params)
+            _estimator = SkXGB(**params)
 
             cv_scores = cross_val_score(
                 _estimator,
@@ -419,3 +419,8 @@ class ParzenCV(object):
         )
 
         return history
+
+@scope.define
+def SkXGB(*args, **kwargs):
+    """XGBoost wrapper"""
+    return xgb.XGBClassifier(*args, **kwargs)
