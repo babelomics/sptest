@@ -12,6 +12,7 @@ from pathlib import Path
 
 import joblib
 import numpy as np
+import pandas as pd
 import xgboost as xgb
 from hyperopt import STATUS_OK, Trials, fmin, hp, tpe
 from hyperopt.pyll import scope
@@ -164,6 +165,8 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
             X_test = X_test.values.reshape(1, -1)
         else:
             X_test = X_test.values
+
+        X_test = pd.DataFrame(X_test)
 
         return self.predict_proba(X_test)[:, POS_CLASS_INDEX]
 
