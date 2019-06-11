@@ -276,15 +276,18 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
                 random_state=seed,
                 n_jobs=n_jobs,
                 max_iter=10**4,
-                solver='lbfgs')),
+                solver='saga')),
             RobustScaler(),
             ZeroCount(),
             PCA(iterated_power=4, svd_solver="randomized", random_state=seed),
             LogisticRegression(
-                C=20.0, dual=False, penalty="l1", random_state=seed,
+                C=20.0,
+                dual=False,
+                penalty="l1",
+                random_state=seed,
                 n_jobs=n_jobs,
                 max_iter=10**4,
-                solver='lbfgs'
+                solver='saga'
             )
         )
 
@@ -320,7 +323,7 @@ class ParzenCV(object):
         space = self.get_default_xgb_space()
         self.history = self.optimize(space, X, y)
 
-        best_params = {k: self.history[k] for k in space.keys()}
+        best_params = {k: self.history[k] for k in space}
         problem_params = self.get_problem_params()
 
         params = {**best_params, **problem_params}
