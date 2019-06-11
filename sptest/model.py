@@ -321,7 +321,7 @@ class ParzenCV(object):
 
     # Estimate XGB params
     def fit(self, X, y):
-        """Fit/optiize via Tree of Parzen estimators."""
+        """Fit/optiize via Tree-structured Parzen Estimator."""
 
         space = self.get_default_xgb_space()
         self.history = self.optimize(space, X, y)
