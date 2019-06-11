@@ -295,7 +295,7 @@ class ParzenCV(object):
     """Find an optimized XGBoost via Tree of Parzen estimators."""
 
     def __init__(self, search_spaces=None,
-                 scoring="average_precision", cv=10, n_jobs=-1,
+                 scoring="average_precision", cv=3, n_jobs=-1,
                  n_iter=10**3, verbose=0, refit=True,
                  random_state=42):
 
