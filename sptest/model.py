@@ -326,7 +326,7 @@ class ParzenCV(object):
         space = self.get_default_xgb_space()
         self.history = self.optimize(space, X, y)
 
-        best_params = {k: self.history[k] for k in space}
+        best_params = {k: self.history[k] for k in space.keys()}
         problem_params = self.get_problem_params()
 
         params = {**best_params, **problem_params}
