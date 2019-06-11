@@ -368,15 +368,15 @@ class ParzenCV(object):
     def get_problem_params(self):
         """Get xgb paramters for unbalanced classifcation."""
         params = dict(
-                max_delta_step=0,
-                verbose=1,
-                verbose_eval=1,
-                silent=1,
-                nthread=self.n_jobs,
-                tree_method='approx',
-                eval_metric='aucpr',
-                objective='binary:logistic'
-            )
+            max_delta_step=0,
+            verbose=1,
+            verbose_eval=1,
+            silent=1,
+            nthread=self.n_jobs,
+            tree_method='approx',
+            eval_metric='aucpr',
+            objective='binary:logistic'
+        )
 
         return params
 
