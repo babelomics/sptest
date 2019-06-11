@@ -362,8 +362,7 @@ class ParzenCV(object):
             reg_alpha=hp.loguniform(
                 "reg_alpha", np.log(0.0001), np.log(1)) - 0.0001,
             reg_lambda=hp.loguniform(
-                "reg_lambda", np.log(1), np.log(4)),
-            scale_pos_weight=1
+                "reg_lambda", np.log(1), np.log(4))
         )
 
         return _space
@@ -372,6 +371,7 @@ class ParzenCV(object):
         """Get xgb paramters for unbalanced classifcation."""
         params = dict(
             max_delta_step=0,
+            scale_pos_weight=1,
             verbose=1,
             verbose_eval=1,
             silent=1,
