@@ -14,6 +14,7 @@ import joblib
 import numpy as np
 import xgboost as xgb
 from hyperopt import STATUS_OK, Trials, fmin, hp, tpe
+from hyperopt.pyll import scope
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
@@ -22,7 +23,6 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import RobustScaler, StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_X_y
-from hyperopt.pyll import scope
 
 from .datasets import load_test_file, load_test_folder
 from .stacking_estimator import StackingEstimator
