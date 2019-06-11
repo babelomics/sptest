@@ -22,6 +22,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import RobustScaler, StandardScaler
 from sklearn.utils.validation import check_is_fitted, check_X_y
+from hyperopt.pyll import scope
 
 from .datasets import load_test_file, load_test_folder
 from .stacking_estimator import StackingEstimator
@@ -313,25 +314,16 @@ class ParzenCV(object):
     # Estimate XGB params
     def fit(self, X, y):
         """Fit/optiize via Tree of Parzen estimators."""
+
         space = self.get_default_xgb_space()
         self.history = self.optimize(space, X, y)
 
-        estimator_ = xgb.XGBClassifier(
-            n_estimators=10000,
-            max_depth=int(self.history['max_depth']),
-            learning_rate=self.history['learning_rate'],
-            min_child_weight=self.history['min_child_weight'],
-            subsample=self.history['subsample'],
-            gamma=self.history['gamma'],
-            colsample_bytree=self.history['colsample_bytree'],
-            verbose=1,
-            verbose_eval=1,
-            silent=1,
-            nthread=self.n_jobs,
-            tree_method='approx',
-            eval_metric='aucpr',
-            objective='binary:logistic'
-        )
+        best_params = {k: self.history[k] for k in space.keys()}
+        problem_params = self.get_problem_params()
+
+        params = {**best_params, **problem_params}
+
+        estimator_ = xgb.XGBClassifier(**params)
 
         if self.refit:
             estimator_.fit(X, y)
@@ -341,31 +333,37 @@ class ParzenCV(object):
     @staticmethod
     def get_default_xgb_space():
         """Get XGBoost default hyperparamter space."""
-        _space = {
-            'learning_rate': hp.uniform('learning_rate', 0.01, 0.1),
-            'max_depth': hp.quniform('max_depth', 8, 15, 1),
-            'min_child_weight': hp.quniform('min_child_weight', 1, 5, 1),
-            'subsample': hp.quniform('subsample', 0.7, 1, 0.05),
-            'gamma': hp.quniform('gamma', 0.9, 1, 0.05),
-            'colsample_bytree': hp.quniform('colsample_bytree', 0.5, 0.7, 0.05)
-        }
+
+        _space = dict(
+            max_depth=scope.int(hp.uniform(
+                "max_depth", 1, 11)),
+            learning_rate=hp.loguniform(
+                "learning_rate", np.log(0.0001), np.log(0.5)) - 0.0001,
+            n_estimators=scope.int(hp.quniform(
+                "n_estimators", 100, 6000, 200)),
+            gamma=hp.loguniform(
+                "gamma", np.log(0.0001), np.log(5)) - 0.0001,
+            min_child_weight=scope.int(hp.loguniform(
+                "min_child_weight", np.log(1), np.log(100))),
+            subsample=hp.uniform(
+                "subsample", 0.5, 1),
+            colsample_bytree=hp.uniform(
+                "colsample_bytree", 0.5, 1),
+            colsample_bylevel=hp.uniform(
+                "colsample_bylevel", 0.5, 1),
+            reg_alpha=hp.loguniform(
+                "reg_alpha", np.log(0.0001), np.log(1)) - 0.0001,
+            reg_lambda=hp.loguniform(
+                "reg_lambda", np.log(1), np.log(4)),
+            scale_pos_weight=1
+        )
 
         return _space
 
-    def optimize(self, params_space, X, y):
-        """Optimization loop."""
-
-        def objective(params):
-            """Objective function to minimize."""
-
-            _estimator = xgb.XGBClassifier(
-                n_estimators=100,
-                max_depth=int(params['max_depth']),
-                learning_rate=params['learning_rate'],
-                min_child_weight=params['min_child_weight'],
-                subsample=params['subsample'],
-                colsample_bytree=params['colsample_bytree'],
-                gamma=params['gamma'],
+    def get_problem_params(self):
+        """Get xgb paramters for unbalanced classifcation."""
+        params = dict(
+                max_delta_step=0,
                 verbose=1,
                 verbose_eval=1,
                 silent=1,
@@ -374,6 +372,20 @@ class ParzenCV(object):
                 eval_metric='aucpr',
                 objective='binary:logistic'
             )
+
+        return params
+
+    def optimize(self, params_space, X, y):
+        """Optimization loop."""
+
+        def objective(params):
+            """Objective function to minimize."""
+
+            problem_params = self.get_problem_params()
+
+            params = {**params, **problem_params}
+
+            _estimator = xgb.XGBClassifier(**params)
 
             cv_scores = cross_val_score(
                 _estimator,
