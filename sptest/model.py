@@ -32,6 +32,19 @@ from .zero_count import ZeroCount
 # Index of the positive class in an probability array,
 POS_CLASS_INDEX = 1
 
+SPACE_DTYPE = dict(
+            max_depth=int,
+            learning_rate=float,
+            n_estimators=int,
+            gamma=float,
+            min_child_weight=int,
+            subsample=float,
+            colsample_bytree=float,
+            colsample_bylevel=float,
+            reg_alpha=float,
+            reg_lambda=float
+        )
+
 
 class SpanishPredictor(BaseEstimator, ClassifierMixin):
     """This class implments a Machine Learning (ML) method to classify a given
@@ -326,7 +339,8 @@ class ParzenCV(object):
         space = self.get_default_xgb_space()
         self.history = self.optimize(space, X, y)
 
-        best_params = {k: self.history[k] for k in space.keys()}
+        best_params = {k: self.history[k] for k in space}
+        best_params = {k: SPACE_DTYPE[k](best_params[k]) for k in best_params}
         problem_params = self.get_problem_params()
 
         params = {**best_params, **problem_params}
