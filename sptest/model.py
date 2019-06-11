@@ -179,8 +179,6 @@ class SpanishPredictor(BaseEstimator, ClassifierMixin):
         else:
             X_test = X_test.values
 
-        X_test = pd.DataFrame(X_test)
-
         return self.predict_proba(X_test)[:, POS_CLASS_INDEX]
 
     @staticmethod
@@ -382,7 +380,7 @@ class ParzenCV(object):
         return _space
 
     def get_problem_params(self):
-        """Get xgb paramters for unbalanced classifcation."""
+        """Get xgb parameters for unbalanced (binary) classification."""
         params = dict(
             max_delta_step=0,
             scale_pos_weight=1,
@@ -392,7 +390,8 @@ class ParzenCV(object):
             nthread=self.n_jobs,
             tree_method='approx',
             eval_metric='aucpr',
-            objective='binary:logistic'
+            objective='binary:logistic',
+            validate_features=False
         )
 
         return params
