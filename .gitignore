@@ -190,9 +190,10 @@ venv.bak/
 ## User files
 #############
 
-notebooks/data/
-
+notebooks/
+install.sh
 *.odt#
+rs.sh
 
 
-notebooks/XGBClassifier_cv_results\.csv
+
